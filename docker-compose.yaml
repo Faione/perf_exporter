@@ -1,0 +1,12 @@
+version: "3.3"
+services:
+  perf_exporter:
+    image: ict.acs.edu/infra/perf_exporter:0.0.1-dev
+    container_name: perf_exporter
+    ports:
+      - 9991:9900 
+    volumes:
+      - '/sys:/sys:ro'
+    privileged: true
+    command:
+      - 'serve'
