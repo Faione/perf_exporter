@@ -11,7 +11,7 @@ import (
 var (
 	PERF_FLAG_PID_CGROUP = 1 << 2
 
-	numCPU = runtime.NumCPU()
+	NumCPU = runtime.NumCPU()
 )
 
 func NewCgroupPerfeventProfilerMap(cgroup string, cpu []int) (map[int]*perf.HardwareProfiler, error) {
@@ -22,8 +22,8 @@ func NewCgroupPerfeventProfilerMap(cgroup string, cpu []int) (map[int]*perf.Hard
 	fd := file.Fd()
 
 	if len(cpu) == 0 {
-		cpu = make([]int, numCPU)
-		for i := 0; i < numCPU; i++ {
+		cpu = make([]int, NumCPU)
+		for i := 0; i < NumCPU; i++ {
 			cpu[i] = i
 		}
 	}

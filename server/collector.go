@@ -1,6 +1,9 @@
 package server
 
 import (
+	"errors"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/Faione/perf_exporter/utils"
@@ -14,21 +17,28 @@ var (
 )
 
 type PerfEventCollector struct {
-	cgroupPerfEventInfo *prometheus.Desc
+	instructionInfo *prometheus.Desc
+	cycleInfo       *prometheus.Desc
 }
 
 func NewPerfEventCollector() (*PerfEventCollector, error) {
 	return &PerfEventCollector{
-		cgroupPerfEventInfo: prometheus.NewDesc(
-			prometheus.BuildFQName("cgroup", "perf_event", "count"),
-			"Perf event count on cgroup",
-			[]string{"event", "id"}, nil,
+		instructionInfo: prometheus.NewDesc(
+			prometheus.BuildFQName("perf_event", "instruction", "count"),
+			"Perf event instruction count",
+			[]string{"id"}, nil,
+		),
+		cycleInfo: prometheus.NewDesc(
+			prometheus.BuildFQName("perf_event", "cycle", "count"),
+			"Perf event cycle count",
+			[]string{"id"}, nil,
 		),
 	}, nil
 }
 
 func (c *PerfEventCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- c.cgroupPerfEventInfo
+	ch <- c.instructionInfo
+	ch <- c.cycleInfo
 }
 
 func (c *PerfEventCollector) Collect(ch chan<- prometheus.Metric) {
@@ -51,17 +61,17 @@ func (c *PerfEventCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 
 		ch <- prometheus.MustNewConstMetric(
-			c.cgroupPerfEventInfo,
+			c.instructionInfo,
 			prometheus.CounterValue,
 			float64(totalInstructions),
-			"Instructions", id,
+			id,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
-			c.cgroupPerfEventInfo,
+			c.cycleInfo,
 			prometheus.CounterValue,
 			float64(totalcycles),
-			"cycles", id,
+			id,
 		)
 
 	}
@@ -69,7 +79,35 @@ func (c *PerfEventCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 func AddCgroupPerfEventCollector(config *PerfEventConfig) error {
-	hwProfilers, err := utils.NewCgroupPerfeventProfilerMap(config.Cgroup, nil)
+	var cpu []int
+
+	if config.Cpuset != "" {
+		str := strings.Split(config.Cpuset, "-")
+		if len(str) < 2 {
+			return errors.New("wrong cpu set format")
+		}
+		lo, err := strconv.Atoi(str[0])
+		if err != nil {
+			return errors.New("wrong cpu set format")
+		}
+
+		hi, err := strconv.Atoi(str[1])
+		if err != nil {
+			return errors.New("wrong cpu set format")
+		}
+
+		if hi < lo || lo < 0 || hi > utils.NumCPU {
+			return errors.New("wrong cpu set")
+		}
+
+		cpu = make([]int, hi-lo+1)
+
+		for i := lo; i <= hi; i++ {
+			cpu[i-lo] = i
+		}
+	}
+
+	hwProfilers, err := utils.NewCgroupPerfeventProfilerMap(config.Cgroup, cpu)
 	if err != nil {
 		return err
 	}
